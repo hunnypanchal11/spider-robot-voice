@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPIDER Robot Voice Control</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #edf5f7;
+    color: #17212b;
+}
+
+header {
+    background: #07566f;
+    color: white;
+    text-align: center;
+    padding: 22px 10px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 26px;
+}
+
+header p {
+    margin-bottom: 0;
+}
+
+.container {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 12px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    margin-bottom: 16px;
+    border-radius: 15px;
+    box-shadow: 0 3px 12px #00000012;
+}
+
+h2 {
+    font-size: 20px;
+    margin-top: 0;
+}
+
+.status {
+    background: #d9f7e5;
+    color: #147744;
+    padding: 10px;
+    border-radius: 8px;
+    display: inline-block;
+    font-weight: bold;
+}
+
+button {
+    border: none;
+    padding: 14px;
+    border-radius: 9px;
+    background: #1976c9;
+    color: white;
+    font-weight: bold;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+button:active {
+    opacity: 0.75;
+}
+
+.full {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.mic {
+    width: 125px;
+    height: 125px;
+    border-radius: 50%;
+    background: #e53935;
+    font-size: 18px;
+    display: block;
+    margin: 22px auto;
+}
+
+.mic.listening {
+    background: #168b50;
+    box-shadow: 0 0 0 8px #168b5020;
+}
+
+.command-box {
+    background: #f0f3f8;
+    padding: 15px;
+    border-radius: 10px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+}
+
+.label {
+    color: #667788;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.value {
+    font-weight: bold;
+    font-size: 17px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 9px;
+    max-width: 330px;
+    margin: 20px auto;
+}
+
+.grid button {
+    min-height: 58px;
+    font-size: 23px;
+}
+
+.stop {
+    background: #e53935;
+}
+
+.secondary {
+    background: #435569;
+}
+
+.two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+input[type="range"] {
+    width: 100%;
+    margin: 18px 0;
+}
+
+.small {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #586775;
+}
+
+footer {
+    text-align: center;
+    padding: 15px;
+    font-size: 12px;
+    color: #647481;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🕷️ SPIDER ROBOT</h1>
+    <p>Voice & Manual Control</p>
+</header>
+
+<div class="container">
+
+    <section class="card">
+        <h2>Connection</h2>
+        <div id="connection" class="status">Not checked</div>
+        <button class="full" onclick="checkConnection()">
+            CHECK ESP32 CONNECTION
+        </button>
+    </section>
+
+    <section class="card">
+        <h2>🎤 Voice Assistant</h2>
+        <p>Speak a command to control your Spider Robot.</p>
+
+        <div class="command-box">
+            <div class="label">YOU SAID</div>
+            <div id="spoken">Waiting for voice command</div>
+
+            <br>
+
+            <div class="label">ROBOT COMMAND</div>
+            <div id="recognized" class="value">STOP</div>
+
+            <br>
+
+            <div class="label">RESULT</div>
+            <div id="voiceResult">Ready</div>
+        </div>
+
+        <button id="micButton" class="mic" onclick="startListening()">
+            🎤<br>MIC<br>SPEAK
+        </button>
+
+        <p class="small">
+            Try saying: "forward", "backward", "left", "right",
+            "stop", "stand", or "sit".
+        </p>
+    </section>
+
+    <section class="card">
+        <h2>Manual Control</h2>
+
+        <div class="grid">
+            <span></span>
+            <button onclick="sendCommand('FORWARD')">▲</button>
+            <span></span>
+
+            <button onclick="sendCommand('LEFT')">◀</button>
+            <button class="stop" onclick="sendCommand('STOP')">■</button>
+            <button onclick="sendCommand('RIGHT')">▶</button>
+
+            <span></span>
+            <button onclick="sendCommand('BACKWARD')">▼</button>
+            <span></span>
+        </div>
+
+        <div class="two">
+            <button class="secondary" onclick="sendCommand('STAND')">
+                STAND
+            </button>
+
+            <button class="secondary" onclick="sendCommand('SIT')">
+                SIT
+            </button>
+        </div>
+
+        <p>
+            <strong>Speed: <span id="speedValue">50</span>%</strong>
+        </p>
+
+        <input
+            type="range"
+            min="0"
+            max="100"
+            value="50"
+            id="speed"
+            oninput="updateSpeedLabel()"
+            onchange="sendSpeed()"
+        >
+    </section>
+
+    <section class="card">
+        <h2>Spider Status</h2>
+        <p>Last command: <strong id="lastCommand">STOP</strong></p>
+        <p>Speed: <strong id="statusSpeed">50%</strong></p>
+        <p>Communication: <strong id="communication">Not tested</strong></p>
+    </section>
+
+    <section class="card">
+        <h2>Setup Information</h2>
+        <p class="small">
+            Connect your phone to the SPIDER_ROBOT Wi-Fi network.
+            The ESP32 address is normally http://192.168.4.1.
+            Internet access may also be needed for online speech recognition.
+        </p>
+    </section>
+
+</div>
+
+<footer>
+    SPIDER ROBOT | ESP32 Voice Control
+</footer>
+
+<script>
+const ESP32 = "http://192.168.4.1";
+
+let recognition = null;
+let listening = false;
+
+function updateSpeedLabel() {
+    const speed = document.getElementById("speed").value;
+
+    document.getElementById("speedValue").textContent = speed;
+    document.getElementById("statusSpeed").textContent = speed + "%";
+}
+
+function setResult(message) {
+    document.getElementById("voiceResult").textContent = message;
+}
+
+function normalizeCommand(text) {
+    const phrase = text.toLowerCase().trim();
+
+    if (/\b(stop|halt|freeze)\b/.test(phrase)) {
+        return "STOP";
+    }
+
+    if (/\b(forward|ahead|move up|go ahead)\b/.test(phrase)) {
+        return "FORWARD";
+    }
+
+    if (/\b(backward|backwards|reverse|move back)\b/.test(phrase)) {
+        return "BACKWARD";
+    }
+
+    if (/\b(left|turn left)\b/.test(phrase)) {
+        return "LEFT";
+    }
+
+    if (/\b(right|turn right)\b/.test(phrase)) {
+        return "RIGHT";
+    }
+
+    if (/\b(stand|stand up|get up)\b/.test(phrase)) {
+        return "STAND";
+    }
+
+    if (/\b(sit|sit down)\b/.test(phrase)) {
+        return "SIT";
+    }
+
+    return null;
+}
+
+function startListening() {
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        setResult(
+            "Speech recognition is not supported by this browser."
+        );
+
+        alert(
+            "Speech recognition is unavailable. " +
+            "Try a supported browser or another voice-control method."
+        );
+
+        return;
+    }
+
+    if (listening && recognition) {
+        recognition.stop();
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+
+    recognition.lang = "en-IN";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = function() {
+        listening = true;
+
+        document.getElementById("micButton")
+            .classList.add("listening");
+
+        document.getElementById("micButton").innerHTML =
+            "LISTENING...";
+
+        setResult("Listening for a command...");
+    };
+
+    recognition.onresult = function(event) {
+        const text =
+            event.results[0][0].transcript;
+
+        document.getElementById("spoken").textContent = text;
+
+        const command = normalizeCommand(text);
+
+        if (!command) {
+            document.getElementById("recognized").textContent =
+                "COMMAND NOT RECOGNIZED";
+
+            setResult("Try saying forward, left, right, or stop.");
+            return;
+        }
+
+        document.getElementById("recognized").textContent = command;
+
+        sendCommand(command);
+    };
+
+    recognition.onerror = function(event) {
+        setResult("Speech recognition error: " + event.error);
+    };
+
+    recognition.onend = function() {
+        listening = false;
+
+        document.getElementById("micButton")
+            .classList.remove("listening");
+
+        document.getElementById("micButton").innerHTML =
+            "🎤<br>MIC<br>SPEAK";
+    };
+
+    try {
+        recognition.start();
+    } catch (error) {
+        setResult("Could not start microphone: " + error.message);
+    }
+}
+
+async function sendCommand(command) {
+    document.getElementById("lastCommand").textContent = command;
+
+    try {
+        const response = await fetch(ESP32 + "/api/command", {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain;charset=UTF-8"
+            },
+            body: command
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+
+        document.getElementById("communication").textContent =
+            "Command sent";
+
+        setResult("Command sent: " + command);
+
+    } catch (error) {
+        document.getElementById("communication").textContent =
+            "Connection failed";
+
+        setResult(
+            "Cannot contact ESP32. Check Wi-Fi and browser restrictions."
+        );
+    }
+}
+
+async function sendSpeed() {
+    const speed = document.getElementById("speed").value;
+
+    try {
+        await fetch(ESP32 + "/api/speed", {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain;charset=UTF-8"
+            },
+            body: speed
+        });
+    } catch (error) {
+        document.getElementById("communication").textContent =
+            "Speed update failed";
+    }
+}
+
+async function checkConnection() {
+    const label = document.getElementById("connection");
+
+    label.textContent = "Checking...";
+
+    try {
+        const response = await fetch(ESP32 + "/api/status", {
+            method: "GET",
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+        }
+
+        label.textContent = "ESP32 reachable";
+
+    } catch (error) {
+        label.textContent = "Connection blocked or unavailable";
+    }
+}
+</script>
+
+</body>
+</html>
