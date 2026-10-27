@@ -309,10 +309,48 @@
   let recognition = null;
   let isListening = false;
   let currentUser = null;
+  let isSpeaking = false;
 
 
   function showMessage(id, message) {
     document.getElementById(id).textContent = message;
+  }
+
+  // Speak a short response through the browser/device speaker.
+  function speakResponse(message) {
+    if (!("speechSynthesis" in window) ||
+        !("SpeechSynthesisUtterance" in window)) {
+      showMessage("voiceMessage",
+        "Command sent, but speech output is not supported by this browser.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    isSpeaking = true;
+
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = "en-IN";
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onend = () => {
+      isSpeaking = false;
+      // Resume listening after the spoken response finishes.
+      if (isListening && recognition && auth.currentUser) {
+        try {
+          recognition.start();
+        } catch (_) {
+          // Recognition may already be running.
+        }
+      }
+    };
+
+    utterance.onerror = () => {
+      isSpeaking = false;
+    };
+
+    window.speechSynthesis.speak(utterance);
   }
 
 
@@ -344,12 +382,14 @@
         "commandMessage",
         "Command sent: " + command
       );
+      return true;
 
     } catch (error) {
       showMessage(
         "commandMessage",
         "Command failed: " + error.message
       );
+      return false;
     }
   }
 
@@ -533,6 +573,8 @@
       recognition.interimResults = false;
 
       recognition.onresult = async (event) => {
+        if (isSpeaking) return;
+
         const result =
           event.results[event.results.length - 1];
 
@@ -549,7 +591,11 @@
         const command = normalizeCommand(spokenText);
 
         if (command) {
-          await sendCommand(command);
+          const sent = await sendCommand(command);
+
+          if (sent && command === "FORWARD") {
+            speakResponse("Moving Forward");
+          }
 
           showMessage(
             "voiceMessage",
@@ -576,7 +622,7 @@
       };
 
       recognition.onend = () => {
-        if (isListening && auth.currentUser) {
+        if (isListening && auth.currentUser && !isSpeaking) {
           try {
             recognition.start();
           } catch (_) {
